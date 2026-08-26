@@ -1,0 +1,13 @@
+services:
+  gateway:
+    container_name: c-gateway
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: 8080
+      CUSTOMERS_URL: http://host.docker.internal:8000
+      PRODUCTS_URL: http://host.docker.internal:8002
+      SHOPPING_URL: http://host.docker.internal:8001
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
