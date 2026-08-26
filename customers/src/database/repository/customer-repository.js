@@ -83,6 +83,19 @@ class CustomerRepository {
         return customer.cart;
     }
 
+    async ClearCart(customerId) {
+        const customer = await CustomerModel.findById(customerId);
+
+        if (!customer) {
+            throw new BadRequestError('Customer not found');
+        }
+
+        customer.cart = [];
+        await customer.save();
+
+        return customer.cart;
+    }
+
     async GetCart(customerId) {
         const customer = await CustomerModel.findById(customerId);
 

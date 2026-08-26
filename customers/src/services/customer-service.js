@@ -125,6 +125,16 @@ class CustomerService {
         }
     }
 
+    async ClearCart(_id) {
+        try {
+            const cart = await this.repository.ClearCart(_id);
+            return FormateData(cart);
+        } catch (err) {
+            if (err instanceof APIError) throw err;
+            throw new APIError('Data Not Found', 404, err.message);
+        }
+    }
+
     async GetCart(_id) {
         try {
             const cart = await this.repository.GetCart(_id);
