@@ -1,0 +1,26 @@
+services:
+  products:
+    container_name: c-products
+    build: .
+    ports:
+      - "8002:8002"
+    environment:
+      PORT: 8002
+      DB_URL: mongodb://products-db:27017/products
+      APP_SECRET: dev-secret-change-me
+    volumes:
+      - .:/app
+      - /app/node_modules
+    depends_on:
+      - products-db
+
+  products-db:
+    container_name: c-products-db
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - products-data:/data/db
+
+volumes:
+  products-data:

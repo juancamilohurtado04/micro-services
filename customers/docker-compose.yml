@@ -1,0 +1,26 @@
+services:
+  customers:
+    container_name: c-customers
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      PORT: 8000
+      DB_URL: mongodb://customers-db:27017/customers
+      APP_SECRET: dev-secret-change-me
+    volumes:
+      - .:/app
+      - /app/node_modules
+    depends_on:
+      - customers-db
+
+  customers-db:
+    container_name: c-customers-db
+    image: mongo:7
+    ports:
+      - "27018:27017"
+    volumes:
+      - customers-data:/data/db
+
+volumes:
+  customers-data:
