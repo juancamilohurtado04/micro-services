@@ -7,7 +7,7 @@ services:
     environment:
       PORT: 8001
       DB_URL: mongodb://customers-db:27017/customers
-      APP_SECRET: dev-secret-change-me
+      APP_SECRET: ${APP_SECRET:?define APP_SECRET en customers/.env (ver .env.example)}
     volumes:
       - .:/app
       - /app/node_modules
