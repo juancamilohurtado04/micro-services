@@ -7,7 +7,6 @@ services:
     environment:
       PORT: 8002
       DB_URL: mongodb://products-db:27017/products
-      APP_SECRET: dev-secret-change-me
     volumes:
       - .:/app
       - /app/node_modules
