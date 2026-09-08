@@ -4,6 +4,7 @@ const STATUS_CODES = {
     UNAUTHORIZED: 401,
     NOT_FOUND: 404,
     INTERNAL_ERROR: 500,
+    SERVICE_UNAVAILABLE: 503,
 };
 
 class APIError extends Error {
@@ -33,10 +34,20 @@ class UnauthorizedError extends APIError {
     }
 }
 
+// El catalogo no respondio. Es distinto de un 500: shopping esta sano, su
+// dependencia no. Se responde 503 para que el gateway y el frontend puedan
+// decir "vuelve a intentarlo" en vez de "algo se rompio".
+class ServiceUnavailableError extends APIError {
+    constructor(description = 'Upstream service unavailable') {
+        super('ServiceUnavailableError', STATUS_CODES.SERVICE_UNAVAILABLE, description);
+    }
+}
+
 module.exports = {
     STATUS_CODES,
     APIError,
     BadRequestError,
     NotFoundError,
     UnauthorizedError,
+    ServiceUnavailableError,
 };

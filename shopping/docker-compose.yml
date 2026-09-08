@@ -7,12 +7,15 @@ services:
     environment:
       PORT: 8003
       DB_URL: mongodb://shopping-db:27017/shopping
-      APP_SECRET: dev-secret-change-me
+      PRODUCTS_URL: http://host.docker.internal:8002
+      APP_SECRET: ${APP_SECRET:?define APP_SECRET en shopping/.env (ver .env.example)}
     volumes:
       - .:/app
       - /app/node_modules
     depends_on:
       - shopping-db
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   shopping-db:
     container_name: c-shopping-db
