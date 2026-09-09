@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Un push nuevo sobre la misma rama cancela la ejecucion anterior: no tiene
+# sentido gastar minutos validando un commit que ya quedo atras.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: ${{ matrix.service }}
+    runs-on: ubuntu-latest
+
+    # Cada microservicio es autonomo: su propio package.json, su propio
+    # node_modules y su propia suite. Se prueban en paralelo y de forma
+    # independiente, igual que se despliegan.
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [gateway, customers, products, shopping]
+
+    defaults:
+      run:
+        working-directory: ${{ matrix.service }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: ${{ matrix.service }}/package-lock.json
+
+      # Las pruebas de integracion levantan un Mongo efimero con
+      # mongodb-memory-server. Sin cache, cada job vuelve a bajar el binario.
+      - name: Cachear el binario de MongoDB en memoria
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/mongodb-binaries
+          key: mongodb-binaries-${{ runner.os }}
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Pruebas
+        run: npm test -- --ci
+
+  # Guardas de arquitectura: son las reglas que la sustentacion pregunta, y
+  # fallan la CI si alguien las rompe sin darse cuenta.
+  arquitectura:
+    name: reglas de arquitectura
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: cors() solo vive en el gateway
+        run: |
+          if grep -rn "cors" customers/src products/src shopping/src; then
+            echo "::error::cors() debe estar unicamente en el gateway"
+            exit 1
+          fi
+          grep -q "app.use(cors())" gateway/src/express-app.js
+
+      - name: products no carga criptografia
+        run: |
+          node -e "
+            const deps = Object.keys(require('./products/package.json').dependencies);
+            const prohibidas = deps.filter((d) => ['bcryptjs', 'jsonwebtoken', 'crypto-js'].includes(d));
+            if (prohibidas.length) {
+              console.error('::error::products no debe depender de ' + prohibidas.join(', '));
+              process.exit(1);
+            }
+            console.log('products depende solo de: ' + deps.join(', '));
+          "
+
+      - name: solo customers firma JWT
+        run: |
+          if grep -rn "jwt.sign" products/src shopping/src gateway/src; then
+            echo "::error::el unico servicio que firma tokens es customers"
+            exit 1
+          fi
+
+      - name: ningun servicio toca la base de otro
+        run: |
+          if grep -rnE "mongodb://[^ '\"]*(customers|products|shopping)" \
+               --include=*.js customers/src products/src shopping/src gateway/src; then
+            echo "::error::un servicio esta apuntando a la base de otro dominio"
+            exit 1
+          fi
+
+      - name: no hay archivos .env versionados
+        run: |
+          if git ls-files | grep -E '(^|/)\.env($|\.)' | grep -v '\.env\.example$'; then
+            echo "::error::hay un .env real versionado"
+            exit 1
+          fi
+          echo "solo hay .env.example versionados"
