@@ -8,8 +8,10 @@ const service = new ShoppingService();
 router.post('/order', UserAuth, async (req, res, next) => {
     try {
         const { _id } = req.user;
-        const { txnId, items, amount } = req.body;
-        const { data } = await service.CreateOrder({ userId: _id, txnId, items, amount });
+        // El importe no se acepta del cliente: lo calcula el servicio con los
+        // precios que da el catalogo. Ver clients/products-client.js.
+        const { txnId, items } = req.body;
+        const { data } = await service.CreateOrder({ userId: _id, txnId, items });
         return res.json(data);
     } catch (err) {
         next(err);

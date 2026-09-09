@@ -3,7 +3,7 @@ const { PORT, requireVars } = require('./src/config');
 const { databaseConnection } = require('./src/database');
 const expressApp = require('./src/express-app');
 
-requireVars('PORT', 'DB_URL', 'APP_SECRET');
+requireVars('PORT', 'DB_URL', 'APP_SECRET', 'PRODUCTS_URL');
 
 const StartServer = async () => {
     const app = express();

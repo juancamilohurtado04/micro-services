@@ -1,4 +1,18 @@
-const { CUSTOMERS_URL, PRODUCTS_URL, SHOPPING_URL } = require('./config');
+// Composicion tolerante a fallos.
+//
+// El perfil que ve el cliente vive en dos dominios: la cuenta, el carrito y la
+// wishlist los tiene customers; el historial de ordenes lo tiene shopping. En
+// vez de obligar al navegador a hacer dos peticiones y unirlas, el gateway las
+// hace en paralelo y devuelve una sola respuesta.
+//
+// El enriquecimiento de cada linea con el precio actual del catalogo NO se
+// hace aqui: lo hace shopping contra products, porque shopping es quien posee
+// las ordenes. El gateway no entra en dominios ajenos, solo compone.
+//
+// Regla de degradacion: la unica dependencia dura es customers, porque sin la
+// cuenta no hay perfil que mostrar. Todo lo demas se degrada a un valor vacio
+// mas un aviso legible.
+const { CUSTOMERS_URL, SHOPPING_URL } = require('./config');
 const { BadGatewayError, UnauthorizedError } = require('./utils/app-errors');
 
 const TIMEOUT_MS = 8000;
@@ -44,49 +58,18 @@ async function composeProfile(req, res, next) {
         if (orders.ok && Array.isArray(orders.data)) {
             orderList = orders.data;
         } else {
-            warnings.push('No se pudieron obtener las ordenes: el microservicio "shopping" no respondio');
+            warnings.push('No se pudo cargar tu historial de pedidos: el servicio de compras no respondio');
         }
 
-        const productIds = [
-            ...new Set(
-                orderList.flatMap((order) => (order.items || []).map((item) => item.productId).filter(Boolean)),
-            ),
-        ];
+        // shopping marca currentProduct como null cuando products no le
+        // respondio. Si hay lineas sin enriquecer, el catalogo esta caido y el
+        // frontend debe poder avisarlo sin dejar de pintar el resto.
+        const lineas = orderList.flatMap((order) => order.items || []);
+        const catalogoVivo = lineas.length === 0 || lineas.some((item) => item.currentProduct);
 
-        const catalog = new Map();
-        if (productIds.length) {
-            const products = await Promise.all(
-                productIds.map((id) => callService(`${PRODUCTS_URL}/products/${id}`, authorization)),
-            );
-
-            products.forEach((result, index) => {
-                if (result.ok && result.data) catalog.set(productIds[index], result.data);
-            });
-
-            if (catalog.size < productIds.length) {
-                warnings.push('Algunos productos no pudieron enriquecerse: el microservicio "products" no respondio');
-            }
+        if (!catalogoVivo) {
+            warnings.push('Los precios actuales no estan disponibles: el catalogo no respondio');
         }
-
-        const enrichedOrders = orderList.map((order) => ({
-            ...order,
-            items: (order.items || []).map((item) => {
-                const current = catalog.get(item.productId);
-
-                return {
-                    ...item,
-                    currentProduct: current
-                        ? {
-                              name: current.name,
-                              price: current.price,
-                              available: current.available,
-                              banner: current.banner,
-                          }
-                        : null,
-                    priceChanged: current ? current.price !== item.price : null,
-                };
-            }),
-        }));
 
         return res.json({
             customer: {
@@ -97,15 +80,15 @@ async function composeProfile(req, res, next) {
                 cart: profile.data.cart || [],
                 wishlist: profile.data.wishlist || [],
             },
-            orders: enrichedOrders,
+            orders: orderList,
             totals: {
-                orders: enrichedOrders.length,
-                spent: enrichedOrders.reduce((sum, order) => sum + (order.amount || 0), 0),
+                orders: orderList.length,
+                spent: orderList.reduce((sum, order) => sum + (order.amount || 0), 0),
             },
             sources: {
                 customers: profile.ok,
                 shopping: orders.ok,
-                products: productIds.length ? catalog.size === productIds.length : true,
+                products: catalogoVivo,
             },
             ...(warnings.length ? { warnings } : {}),
         });
