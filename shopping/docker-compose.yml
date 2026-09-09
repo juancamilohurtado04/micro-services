@@ -3,9 +3,9 @@ services:
     container_name: c-shopping
     build: .
     ports:
-      - "8001:8001"
+      - "8003:8003"
     environment:
-      PORT: 8001
+      PORT: 8003
       DB_URL: mongodb://shopping-db:27017/shopping
       APP_SECRET: dev-secret-change-me
     volumes:

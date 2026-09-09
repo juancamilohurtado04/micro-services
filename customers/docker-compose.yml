@@ -3,11 +3,11 @@ services:
     container_name: c-customers
     build: .
     ports:
-      - "8000:8000"
+      - "8001:8001"
     environment:
-      PORT: 8000
+      PORT: 8001
       DB_URL: mongodb://customers-db:27017/customers
-      APP_SECRET: dev-secret-change-me
+      APP_SECRET: ${APP_SECRET:?define APP_SECRET en customers/.env (ver .env.example)}
     volumes:
       - .:/app
       - /app/node_modules
